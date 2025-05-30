@@ -3,7 +3,13 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - CGV_Crowd
+  - CGV_Expert
+  - CGV_Direction
+  - CGV_Goal
+  - CGV_Range
+  - CGV_NPC_WayPoint
   layers:
   - Default
   - TransparentFX
