@@ -28,6 +28,18 @@ public class AgentController : MonoBehaviour
     private float detectionDistance = 0.45f; // Adjust based on your agent's size
     private float detectionRadius = 0.01f;  // Width of detection
 
+    // === step-climb 專用參數 ===
+    [Header("Step-Climb Settings")]
+    [SerializeField] private float stepHeight = 0.30f;     // 一階高度
+    [SerializeField] private float rayDistance = 0.45f;     // 前向偵測距離
+    [SerializeField] private float climbSmooth = 4.0f;      // 垂直抬升速度
+    [SerializeField] private LayerMask groundMask = ~0;       // 只要包含 Ground/樓梯
+
+
+    private void Awake()
+    {
+        Physics.gravity = new Vector3(0, -30f, 0);   // 整個專案
+    }
     void Start()
     {
         shininess = SceneManager.GetActiveScene().name == "Shop" ? 0.5f : 1.8f;
@@ -35,7 +47,7 @@ public class AgentController : MonoBehaviour
         rigid = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
 
-        rigid.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezePositionY;
+        rigid.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
 
         string prefabDir = Path.Combine(Application.dataPath, "Resources", prefabRootPath).Replace("\\", "/");
         if (Directory.Exists(prefabDir))
@@ -170,6 +182,75 @@ public class AgentController : MonoBehaviour
 
         //* wang
         //debugGizmos.UpdateCircle();
+
+        StepClimb();     // 再嘗試抬升
+        //if (!climbingNow) SnapToGround();  // 先貼地
+    }
+
+    private void StepClimb()
+    {
+        // 1. 低光束 & 高光束的射線起點
+        Vector3 fwd = (targetDirection.sqrMagnitude > 0.001f) ? targetDirection.normalized
+                                                              : transform.forward;
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        float radius = col ? col.radius : 0.25f;
+
+        Vector3 originLow = transform.position + Vector3.up * 0.05f
+                                               + fwd * (radius + 0.02f);
+        Vector3 originHigh = originLow + Vector3.up * stepHeight;
+
+        bool hitLow = Physics.Raycast(originLow, fwd,
+                                       out RaycastHit hitInfoLow,
+                                       rayDistance, groundMask);
+        bool hitHigh = Physics.Raycast(originHigh, fwd,
+                                        out RaycastHit hitHighInfo,
+                                       rayDistance, groundMask);
+
+        // 條件：低光束撞到 & 高光束沒撞到 ⇒ 可爬階
+        if (hitLow && !hitHigh)
+        {
+            Vector3 pos = rigid.position;
+            float targetY = hitInfoLow.point.y + stepHeight;
+
+            // 平滑抬升
+            pos.y = Mathf.MoveTowards(pos.y, targetY, climbSmooth * Time.fixedDeltaTime);
+            rigid.MovePosition(pos);
+        }
+
+        //if (hitLow) Debug.Log("Low   " + hitInfoLow.collider.name);
+        //if (hitHigh) Debug.Log("High  " + hitHighInfo.collider.name);
+    }
+
+    //void OnDrawGizmosSelected()
+    //{
+    //    Vector3 fwd = Application.isPlaying ? transform.forward : Vector3.forward;
+    //    CapsuleCollider col = GetComponent<CapsuleCollider>();
+    //    float radius = col ? col.radius : 0.25f;
+
+    //    Vector3 originLow = transform.position + Vector3.up * 0.05f + fwd * (radius + 0.02f);
+    //    Vector3 originHigh = originLow + Vector3.up * stepHeight;
+
+    //    Gizmos.color = Color.red;
+    //    Gizmos.DrawLine(originLow, originLow + fwd * rayDistance);
+    //    Gizmos.color = Color.green;
+    //    Gizmos.DrawLine(originHigh, originHigh + fwd * rayDistance);
+    //}
+
+    // ===== 補一個簡單「貼地」，防止浮空 =====
+    private void SnapToGround()
+    {
+        // 從角色上方打一條往下的 Ray，量到最近地面
+        if (Physics.Raycast(transform.position + Vector3.up * 1f,
+                            Vector3.down,
+                            out RaycastHit hit,
+                            5f,
+                            LayerMask.GetMask("Default", "Ground")))   // 視專案調整
+        {
+            // 將角色 y 設到碰撞點 (保留 xz)
+            Vector3 p = transform.position;
+            p.y = hit.point.y;
+            transform.position = p;
+        }
     }
 
     void OnCollisionStay(Collision collision)

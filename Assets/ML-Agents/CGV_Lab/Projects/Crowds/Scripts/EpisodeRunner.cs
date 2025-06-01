@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class EpisodeRunner : MonoBehaviour
-{    
+{
     public int randNPC = 4;
     private Locations crowdsInitLocation;
     private GameObject[] crowds;
-    
+
     public void EpisodeInit(Vector3 agentPosition)
     {
         InitCrowds(agentPosition);
@@ -112,7 +112,8 @@ public class EpisodeRunner : MonoBehaviour
         int sampleCount = 0;
         bool check = false;
 
-        do {
+        do
+        {
             sampleCount++;
             if (sampleCount > sampleMax)
             {
@@ -123,16 +124,16 @@ public class EpisodeRunner : MonoBehaviour
             check = false;
 
             randPos = new Vector3(Random.Range(-randSize, randSize), 0, Random.Range(-randSize, randSize));
-            
+
             Collider[] hitColliders = Physics.OverlapSphere(randPos, collisionRadius);
-            for (int i = 0; i < hitColliders.Length; ++i)
-            {
-                if (hitColliders[i].tag != "CGV_Crowd" && hitColliders[i].tag != "CGV_Ground" && hitColliders[i].tag != "CGV_Expert")
-                {
-                    check = true;
-                    break;
-                }
-            } 
+            //for (int i = 0; i < hitColliders.Length; ++i)
+            //{
+            //    if (hitColliders[i].tag != "CGV_Crowd" && hitColliders[i].tag != "CGV_Ground" && hitColliders[i].tag != "CGV_Expert")
+            //    {
+            //        check = true;
+            //        break;
+            //    }
+            //} 
         } while (check);
 
         return position + randPos;

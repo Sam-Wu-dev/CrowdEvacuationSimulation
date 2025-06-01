@@ -13,14 +13,6 @@ using UnityEngine.UIElements;
 
 public class PassenagerAgent : Agent
 {
-    public enum SceneType
-    {
-        Hall,
-        SchoolInterior,
-        SchoolExterior,
-        Shop,
-    }
-
     public DepthCamera viewCamera;
     public bool mainAgent;
     public bool isInitialPosition;
@@ -29,17 +21,10 @@ public class PassenagerAgent : Agent
     public bool isInitialCondition;
     public int episodeLength;
 
-    public TextController rewardText;
-    public TrajectoryRecorder trajectoryRecorder;
-    public AgentNPC agentNPC;
-
     [SerializeField]
-    private SceneType sceneType = SceneType.Hall;
-
     private AgentController character;
     private EpisodeRunner epiRunner;
     private TargetArea[] targetAreas;
-    private TXTWriter txtWriter;
     //private float lineThickness = 0.1f;
     private float moveSpeed = 1.8f;
 
@@ -123,6 +108,8 @@ public class PassenagerAgent : Agent
 
     private Vector3 lastPos;
     private float lastTime;
+    private static HashSet<int> usedInitIndices = new HashSet<int>(); // 避免重複使用的位置 index
+
 
     void Start()
     {
@@ -207,6 +194,7 @@ public class PassenagerAgent : Agent
 
         //lastPos = transform.position;
         //lastTime = Time.fixedTime;
+        //SnapToGround();
     }
 
     private void DrawCircleShape(Vector3 direction, Color color)
@@ -249,26 +237,8 @@ public class PassenagerAgent : Agent
         lastPosition_Reward = character.transform.position;
         checkPosition = character.transform.position;
 
-        if (sceneType == SceneType.Hall)
-        {
-            sceneMin = new Vector2(-44, -2.5f);  // -45, -3
-            sceneSize = new Vector2(46, 46);  // 48, 48
-        }
-        else if (sceneType == SceneType.SchoolInterior)
-        {
-            sceneMin = new Vector2(-34, -21);
-            sceneSize = new Vector2(74, 24);
-        }
-        else if (sceneType == SceneType.SchoolExterior)
-        {
-            sceneMin = new Vector2(-46, -64);
-            sceneSize = new Vector2(79, 80);
-        }
-        else if (sceneType == SceneType.Shop)
-        {
-            sceneMin = new Vector2(-44, -14);
-            sceneSize = new Vector2(86, 26);
-        }
+        sceneMin = new Vector2(-44, -2.5f);  // -45, -3
+        sceneSize = new Vector2(46, 46);  // 48, 48
 
         GenerateExploGrid();
         ResetTable();
@@ -394,6 +364,8 @@ public class PassenagerAgent : Agent
         viewCamera.EpisodeInit();
         character.EpisodeInit();
 
+        if (mainAgent) usedInitIndices.Clear();
+
         memoryCounter = 0;
         collisionReward = 0;
         collisionDistance = 999;
@@ -422,9 +394,6 @@ public class PassenagerAgent : Agent
         //trejectoryLastPosition = transform.position;
 
         ResetTable();
-
-        if (trajectoryRecorder != null) trajectoryRecorder.StartEpisode();
-        if (agentNPC != null) agentNPC.EpisodeInit();
     }
 
     private void InitBoards()
@@ -556,12 +525,12 @@ public class PassenagerAgent : Agent
         // 用來load fail agent的初始位置
         if (failAgent != null && failAgent.enabled && failAgent.load && isFailAgentInitPos)
         {
-            Debug.Log($"failagnet init, totalEpisode: {totalEpisode}");
+            //Debug.Log($"failagnet init, totalEpisode: {totalEpisode}");
             InitializeFailAgent();
         }
         else
         {
-            Debug.Log($"success agent init, totalEpisode: {totalEpisode}");
+            //Debug.Log($"success agent init, totalEpisode: {totalEpisode}");
             if (isInitialCondition && (restart || !checkMove))
             {
                 Debug.Log("restart last eposide");
@@ -587,73 +556,76 @@ public class PassenagerAgent : Agent
         lastPosition_Reward = character.transform.position;
         restart = true;
         checkMove = true;
+
+        //SnapToGround();
+    }
+
+    private void SnapToGround()
+    {
+        // 從角色上方打一條往下的 Ray，量到最近地面
+        if (Physics.Raycast(transform.position + Vector3.up * 1f,
+                            Vector3.down,
+                            out RaycastHit hit,
+                            5f,
+                            LayerMask.GetMask("Default", "Ground")))   // 視專案調整
+        {
+            // 將角色 y 設到碰撞點 (保留 xz)
+            Vector3 p = transform.position;
+            p.y = hit.point.y;
+            transform.position = p;
+        }
     }
 
     private void RandomScenePosition()
     {
-        if (sceneType == SceneType.Hall)
+        bool check = false;
+        int sampleCount = 0, sampleMax = 100, idx = 0;
+        float collisionRadius = 0.35f;
+        Vector3 randPos = initialPositionList.transform.GetChild(idx).position;
+
+        do
         {
-            gameObject.transform.position = RandomInitPosition(Vector2.zero, new Vector2(-43, 0), new Vector2(0, 43));
-            gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
-        }
-        else if (sceneType == SceneType.SchoolInterior)
-        {
-            bool check = false;
-            int sampleCount = 0, sampleMax = 100, idx = 0;
-            float collisionRadius = 0.35f;
-            Vector3 randPos = initialPositionList.transform.GetChild(idx).position;
-
-            do
+            sampleCount++;
+            if (sampleCount > sampleMax)
             {
-                sampleCount++;
-                if (sampleCount > sampleMax)
-                {
-                    idx = 0;
-                    break;
-                }
-
-                check = false;
-
-                idx = Random.Range(0, initialPositionList.transform.childCount);
-                randPos = initialPositionList.transform.GetChild(idx).position;
-
-                Collider[] hitColliders = Physics.OverlapSphere(randPos, collisionRadius);
-                for (int i = 0; i < hitColliders.Length; ++i)
-                {
-                    if (hitColliders[i].tag != "CGV_Crowd" && hitColliders[i].tag != "CGV_Ground" && hitColliders[i].tag != "CGV_Expert"
-                        && hitColliders[i].tag != "CGV_Range")
-                    {
-                        check = true;
-                        break;
-                    }
-                }
-            } while (check);
-
-            gameObject.transform.position = randPos;
-            gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
-        }
-        else if (sceneType == SceneType.SchoolExterior)
-        {
-            Vector3 pos = new Vector2(-32, -19);
-            float rnd = Random.Range(0f, 1f);
-
-            if (rnd > 0.5f)
-            {
-                pos = RandomInitPosition(new Vector2(-32, -19), new Vector2(0, 64), new Vector2(0, 33));
-            }
-            else
-            {
-                pos = RandomInitPosition(new Vector2(-46, -64), new Vector2(0, 79), new Vector2(0, 41));
+                idx = 0;
+                break;
             }
 
-            gameObject.transform.position = pos;
-            gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
-        }
-        else if (sceneType == SceneType.Shop)
+            check = false;
+
+            idx = GetUniqueRandomIndex(initialPositionList.transform.childCount);
+            randPos = initialPositionList.transform.GetChild(idx).position;
+
+            Collider[] hitColliders = Physics.OverlapSphere(randPos, collisionRadius);
+            //for (int i = 0; i < hitColliders.Length; ++i)
+            //{
+            //    if (hitColliders[i].tag != "CGV_Crowd" && hitColliders[i].tag != "CGV_Ground" && hitColliders[i].tag != "CGV_Expert"
+            //        && hitColliders[i].tag != "CGV_Range")
+            //    {
+            //        check = true;
+            //        break;
+            //    }
+            //}
+        } while (check);
+
+        gameObject.transform.position = randPos;
+        //gameObject.transform.position = new Vector3(82.6699982f, 10.6999998f, -44f);
+        gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
+    }
+
+    private int GetUniqueRandomIndex(int maxCount)
+    {
+        int tries = 0;
+        int idx;
+        do
         {
-            gameObject.transform.position = RandomInitPosition(sceneMin, new Vector2(0, 86), new Vector2(0, 26));
-            gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
-        }
+            idx = Random.Range(0, maxCount);
+            tries++;
+        } while (usedInitIndices.Contains(idx) && tries < 100);
+
+        usedInitIndices.Add(idx);
+        return idx;
     }
 
     void OnCollisionEnter(Collision collision)
@@ -662,8 +634,6 @@ public class PassenagerAgent : Agent
         {
             if (collision.gameObject == targetArea.gameObject)
             {
-                if (trajectoryRecorder != null) trajectoryRecorder.EndEpisode();
-
                 SetReward(50);
 
                 restart = false;
