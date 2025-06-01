@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Hayq Art/GrantStadium/Scenes/Demo.unity
+    guid: f42de0fc91acb644181f24bd7b167a6e
   m_configObjects: {}

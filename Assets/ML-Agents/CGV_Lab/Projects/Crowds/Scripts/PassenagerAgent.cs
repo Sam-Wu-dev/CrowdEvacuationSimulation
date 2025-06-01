@@ -610,7 +610,7 @@ public class PassenagerAgent : Agent
         } while (check);
 
         gameObject.transform.position = randPos;
-        //gameObject.transform.position = new Vector3(82.6699982f, 10.6999998f, -44f);
+        //gameObject.transform.position = new Vector3(100.690002f, 1.58000004f, -64.6800003f);
         gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
     }
 

@@ -161,6 +161,7 @@ public class CheckRay : MonoBehaviour
                     minRayHitDistance = rayHitDistance;
                     hitTag = goHit.tag;
                 }
+                //Debug.Log($"name: {goHit.name}");
             }
         }
 
