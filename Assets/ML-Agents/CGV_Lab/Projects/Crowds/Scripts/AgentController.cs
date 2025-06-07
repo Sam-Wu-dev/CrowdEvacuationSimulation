@@ -27,6 +27,7 @@ public class AgentController : MonoBehaviour
 
     private float detectionDistance = 0.45f; // Adjust based on your agent's size
     private float detectionRadius = 0.01f;  // Width of detection
+    private bool climbingNow = false; // 是否正在爬階
 
     // === step-climb 專用參數 ===
     [Header("Step-Climb Settings")]
@@ -38,7 +39,7 @@ public class AgentController : MonoBehaviour
 
     private void Awake()
     {
-        Physics.gravity = new Vector3(0, -30f, 0);   // 整個專案
+        Physics.gravity = new Vector3(0, -60f, 0);   // 整個專案
     }
     void Start()
     {
@@ -79,6 +80,7 @@ public class AgentController : MonoBehaviour
                 int seed = GetInstanceID() + System.DateTime.Now.Millisecond;
                 System.Random sysRandom = new System.Random(seed);
                 string randomPrefabPath = prefabPaths[sysRandom.Next(prefabPaths.Length)];
+                //string randomPrefabPath = prefabPaths[4];
 
                 GameObject loadedModel = Resources.Load<GameObject>(Path.Combine(prefabRootPath, randomPrefabPath).Replace("\\", "/"));
                 Transform loadedModelTransform = loadedModel.transform.Find(Path.Combine(randomPrefabPath, "m01", randomPrefabPath).Replace("\\", "/"));
@@ -209,12 +211,18 @@ public class AgentController : MonoBehaviour
         // 條件：低光束撞到 & 高光束沒撞到 ⇒ 可爬階
         if (hitLow && !hitHigh)
         {
+            climbingNow = true;
+
             Vector3 pos = rigid.position;
             float targetY = hitInfoLow.point.y + stepHeight;
 
             // 平滑抬升
             pos.y = Mathf.MoveTowards(pos.y, targetY, climbSmooth * Time.fixedDeltaTime);
             rigid.MovePosition(pos);
+        }
+        else
+        {
+            climbingNow = false;  // 沒爬階了
         }
 
         //if (hitLow) Debug.Log("Low   " + hitInfoLow.collider.name);

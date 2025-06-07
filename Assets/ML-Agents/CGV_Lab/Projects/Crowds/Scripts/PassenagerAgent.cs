@@ -110,6 +110,10 @@ public class PassenagerAgent : Agent
     private float lastTime;
     private static HashSet<int> usedInitIndices = new HashSet<int>(); // 避免重複使用的位置 index
 
+    public bool isFall = false;
+    public float fallPenalty = -1f;    // 懲罰值
+    public float fallRayThreshold = 2f; // 當 agent 距離地面超過這個值，視為跳樓
+
 
     void Start()
     {
@@ -578,39 +582,15 @@ public class PassenagerAgent : Agent
 
     private void RandomScenePosition()
     {
-        bool check = false;
-        int sampleCount = 0, sampleMax = 100, idx = 0;
-        float collisionRadius = 0.35f;
+        int idx = GetUniqueRandomIndex(initialPositionList.transform.childCount);
         Vector3 randPos = initialPositionList.transform.GetChild(idx).position;
 
-        do
-        {
-            sampleCount++;
-            if (sampleCount > sampleMax)
-            {
-                idx = 0;
-                break;
-            }
-
-            check = false;
-
-            idx = GetUniqueRandomIndex(initialPositionList.transform.childCount);
-            randPos = initialPositionList.transform.GetChild(idx).position;
-
-            Collider[] hitColliders = Physics.OverlapSphere(randPos, collisionRadius);
-            //for (int i = 0; i < hitColliders.Length; ++i)
-            //{
-            //    if (hitColliders[i].tag != "CGV_Crowd" && hitColliders[i].tag != "CGV_Ground" && hitColliders[i].tag != "CGV_Expert"
-            //        && hitColliders[i].tag != "CGV_Range")
-            //    {
-            //        check = true;
-            //        break;
-            //    }
-            //}
-        } while (check);
-
         gameObject.transform.position = randPos;
-        //gameObject.transform.position = new Vector3(100.690002f, 1.58000004f, -64.6800003f);
+        //gameObject.transform.position = new Vector3(99.5599976f, 1.63f, -61.1199989f);  // 一樓斜
+        //gameObject.transform.position = new Vector3(92.2f, 5.58f, -51.6f);  // 二樓綠色右上
+        //gameObject.transform.position = new Vector3(81.5999985f, 9.57999992f, -44.2599983f); // 可
+        //gameObject.transform.position = new Vector3(86.4400024f, 11.3500004f, -40.2799988f);
+        //gameObject.transform.position = new Vector3(37.8f, 1.63f, -65f);  // 一樓斜
         gameObject.transform.rotation = Quaternion.Euler(0, Random.Range(-180, 180), 0);
     }
 
@@ -623,6 +603,7 @@ public class PassenagerAgent : Agent
             idx = Random.Range(0, maxCount);
             tries++;
         } while (usedInitIndices.Contains(idx) && tries < 100);
+        //Debug.Log($"tries: {tries}");
 
         usedInitIndices.Add(idx);
         return idx;
@@ -656,8 +637,8 @@ public class PassenagerAgent : Agent
                 {
                     checkRay.EpisodeInit();
                 }
-                EndEpisode();                     // training
-                //gameObject.SetActive(false);    // testing
+                //EndEpisode();                     // training
+                gameObject.SetActive(false);    // testing
             }
         }
     }
@@ -766,6 +747,24 @@ public class PassenagerAgent : Agent
         {
             AddReward(penalty);
             isMove = true;
+        }
+
+        // --- 跳樓偵測 (Raycast 版本) ---
+        if (isFall)
+        {
+            RaycastHit hit;
+            Vector3 rayStart = transform.position + Vector3.up * 0.5f;  // 稍微從上方開始射線，避免碰到自身 collider
+            float rayMaxDistance = 10f;
+
+            if (Physics.Raycast(rayStart, Vector3.down, out hit, rayMaxDistance))
+            {
+                float groundDistance = hit.distance;
+                if (groundDistance > fallRayThreshold)
+                {
+                    AddReward(fallPenalty);
+                    //Debug.Log($" Jumped off detected by Raycast! Distance = {groundDistance}");
+                }
+            }
         }
 
         collisionReward = 0;

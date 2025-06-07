@@ -48,10 +48,11 @@ public class NPCControl : MonoBehaviour
 
         time += Time.fixedDeltaTime;
 
-        foreach (TargetArea targetArea in targetAreas)
+        foreach (var waypoint in waypoints)
         {
-            if (Vector3.Distance(transform.position, targetArea.transform.position) < 2f)
+            if (Vector3.Distance(transform.position, waypoint.transform.position) < 2f)
             {
+                Debug.Log("NPC " + gameObject.name + " reached target area: " + waypoint.name);
                 gameObject.SetActive(false);
                 return;
             }
